@@ -17,6 +17,8 @@ mkdirSync(NOTES, { recursive: true })
 const token = crypto.randomUUID().replaceAll('-', '')
 // PR_REVIEW_HOST=0.0.0.0 (or an interface address) exposes the page beyond this machine; the URL token is the only guard
 const HOST = process.env.PR_REVIEW_HOST || '127.0.0.1'
+// a fixed port keeps an ssh tunnel valid across restarts; 0 picks a free one
+const PORT = Number(process.env.PR_REVIEW_PORT) || 0
 const out = (o: object) => console.log(JSON.stringify(o))
 
 interface Msg { role: 'user' | 'claude'; text: string; done: boolean }
@@ -174,7 +176,7 @@ const json = (o: unknown, status = 200) => Response.json(o, { status })
 const MIME: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 
 const server = Bun.serve({
-  port: 0,
+  port: PORT,
   hostname: HOST,
   idleTimeout: 0,
   async fetch(req) {
