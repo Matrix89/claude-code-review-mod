@@ -83,5 +83,5 @@ export interface GraphNode {
   changed: boolean; additions: number; deletions: number
   external: number // imports that leave the repo (crates, npm packages, system headers)
 }
-export interface GraphEdge { from: string; to: string; names: string[]; line: number; kind: 'use' | 'mod' | 'import' | 'include' }
+export interface GraphEdge { from: string; to: string; names: string[]; line: number; lines: number[]; kind: 'use' | 'mod' | 'import' | 'include' }
 export interface GraphData { nodes: GraphNode[]; edges: GraphEdge[]; stats: { files: number; ms: number; capped: boolean } }

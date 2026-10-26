@@ -88,8 +88,11 @@ function draw() {
   vp.append(bg, eg, ng); svg.append(defs, vp)
   for (const e of edges) {
     e.el = svgEl('line', { 'marker-end': 'url(#garrow)', class: 'gedge ' + e.kind })
-    const t = svgEl('title'); t.textContent = `${baseName(e.from)} → ${baseName(e.to)} (${e.kind}${e.names.length ? ': ' + e.names.join(', ') : ''})`
-    e.el.append(t); eg.append(e.el)
+    e.hit = svgEl('line', { class: 'gehit' })   // a fat invisible line, so a 1px edge is easy to hover
+    e.hit.addEventListener('mouseenter', ev => edgeTip(e, ev))
+    e.hit.addEventListener('mousemove', moveTip)
+    e.hit.addEventListener('mouseleave', hideTip)
+    eg.append(e.el, e.hit)
   }
   for (const n of g.nodes) {
     n.el = svgEl('g', { class: 'gnode' + (n.changed ? ' changed' : '') })
@@ -206,8 +209,8 @@ function separate() {
 function place() {
   for (const e of g.edges) {
     const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y, d = Math.hypot(dx, dy) || 1
-    e.el.setAttribute('x1', e.a.x + (dx / d) * e.a.r); e.el.setAttribute('y1', e.a.y + (dy / d) * e.a.r)
-    e.el.setAttribute('x2', e.b.x - (dx / d) * (e.b.r + 2)); e.el.setAttribute('y2', e.b.y - (dy / d) * (e.b.r + 2))
+    const x1 = e.a.x + (dx / d) * e.a.r, y1 = e.a.y + (dy / d) * e.a.r, x2 = e.b.x - (dx / d) * (e.b.r + 2), y2 = e.b.y - (dy / d) * (e.b.r + 2)
+    for (const l of [e.el, e.hit]) { l.setAttribute('x1', x1); l.setAttribute('y1', y1); l.setAttribute('x2', x2); l.setAttribute('y2', y2) }
   }
   boxRects()
   for (const b of g.boxes) {
@@ -264,6 +267,38 @@ function initGraphInput() {
     svg.addEventListener('pointermove', move); svg.addEventListener('pointerup', up)
   })
 }
+
+// ---- edge tooltip: the import statement(s) behind an edge ---------------------------------------
+const srcCache = new Map()
+const srcLine = (path, n) => {
+  const k = path + ':' + n
+  if (!srcCache.has(k)) srcCache.set(k, rapi(`source?path=${encodeURIComponent(path)}&from=${n}&to=${n}`).then(r => r.lines?.[0]?.html ?? '').catch(() => ''))
+  return srcCache.get(k)
+}
+let tipFor = null
+async function edgeTip(e, ev) {
+  tipFor = e
+  e.el.classList.add('hot')
+  const tip = $('#gtip')
+  const lines = e.lines?.length ? e.lines : [e.line]
+  const head = `<div class="gt1"><b>${esc(baseName(e.from))}</b> → <b>${esc(baseName(e.to))}</b> <span class="dim">${e.kind === 'mod' ? 'mod declaration' : e.kind}</span></div>` +
+    (e.names.length ? `<div class="gtn">${e.names.map(n => `<code>${esc(n)}</code>`).join(' ')}</div>` : '')
+  tip.innerHTML = head + lines.map(l => `<div class="gtl"><span class="dim">${esc(baseName(e.from))}:${l}</span><code>…</code></div>`).join('')
+  tip.hidden = false
+  moveTip(ev)
+  const htmls = await Promise.all(lines.map(l => srcLine(e.from, l)))
+  if (tipFor !== e) return
+  tip.innerHTML = head + lines.map((l, i) => `<div class="gtl"><span class="dim">${esc(baseName(e.from))}:${l}</span><code>${htmls[i] || ''}</code></div>`).join('')
+  moveTip(ev)
+}
+function moveTip(ev) {
+  const tip = $('#gtip'), box = $('#graph').getBoundingClientRect()
+  const x = Math.min(ev.clientX - box.left + 14, box.width - tip.offsetWidth - 8)
+  const y = ev.clientY - box.top + 16
+  tip.style.left = Math.max(8, x) + 'px'
+  tip.style.top = (y + tip.offsetHeight > box.height ? ev.clientY - box.top - tip.offsetHeight - 10 : y) + 'px'
+}
+function hideTip() { tipFor?.el.classList.remove('hot'); tipFor = null; $('#gtip').hidden = true }
 
 // ---- highlight / search / detail --------------------------------------------------------------
 function focus(n) {

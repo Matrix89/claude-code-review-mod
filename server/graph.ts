@@ -221,7 +221,7 @@ export async function buildGraph(worktree: string, changed: Map<string, { additi
   const res = new Resolver([...parsed.keys()], cargo, new Set([...parsed.keys()].filter(p => p.endsWith('.py'))))
   res.indexRust(parsed)
 
-  const edges = new Map<string, { from: string; to: string; names: Set<string>; line: number; kinds: Set<string> }>()
+  const edges = new Map<string, { from: string; to: string; names: Set<string>; line: number; lines: Set<number>; kinds: Set<string> }>()
   const external = new Map<string, number>()
   for (const [from, pf] of parsed) {
     const lang = EXT[from.split('.').pop()!.toLowerCase()]
@@ -230,8 +230,8 @@ export async function buildGraph(worktree: string, changed: Map<string, { additi
       if (!to) { if (i.kind !== 'mod') external.set(from, (external.get(from) ?? 0) + 1); continue }
       if (to === from) continue
       const k = `${from}\0${to}`
-      const e = edges.get(k) ?? { from, to, names: new Set(), line: i.line, kinds: new Set() }
-      i.names.forEach(n => n && e.names.add(n)); e.kinds.add(i.kind)
+      const e = edges.get(k) ?? { from, to, names: new Set(), line: i.line, lines: new Set(), kinds: new Set() }
+      i.names.forEach(n => n && e.names.add(n)); e.kinds.add(i.kind); e.lines.add(i.line)
       edges.set(k, e)
     }
   }
@@ -249,7 +249,7 @@ export async function buildGraph(worktree: string, changed: Map<string, { additi
   }
   return {
     nodes,
-    edges: [...edges.values()].map(e => ({ from: e.from, to: e.to, names: [...e.names].slice(0, 12), line: e.line, kind: [...e.kinds][0] as GraphData['edges'][0]['kind'] })),
+    edges: [...edges.values()].map(e => ({ from: e.from, to: e.to, names: [...e.names].slice(0, 12), line: e.line, lines: [...e.lines].sort((a, b) => a - b).slice(0, 5), kind: [...e.kinds][0] as GraphData['edges'][0]['kind'] })),
     stats: { files: parsed.size, ms: Math.round(performance.now() - t0), capped: all.length >= MAX_FILES },
   }
 }

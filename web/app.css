@@ -234,3 +234,10 @@ body.dragging { cursor: ns-resize; user-select: none; }
 .gbox { fill: hsl(var(--h) 60% 55% / 0.06); stroke: hsl(var(--h) 50% 55% / 0.5); stroke-width: 1.2; stroke-dasharray: 5 4; pointer-events: none; }
 .gboxl { font: 600 11px var(--mono); fill: hsl(var(--h) 45% 55%); pointer-events: none; }
 #gsvg.focus .gbox, #gsvg.focus .gboxl { opacity: 0.5; }
+.gehit { stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: help; }
+.gedge.hot { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2.4; }
+#gtip { position: absolute; z-index: 5; max-width: min(560px, 80%); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.3); pointer-events: none; }
+#gtip[hidden] { display: none; }
+#gtip .gtn { margin: 2px 0; } #gtip .gtn code { background: var(--panel); border-radius: 4px; padding: 0 4px; }
+#gtip .gtl { display: flex; gap: 8px; font-family: var(--mono); white-space: pre; overflow: hidden; }
+#gtip .gtl .dim { flex: none; }
