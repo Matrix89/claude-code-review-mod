@@ -92,6 +92,7 @@ function draw() {
     e.hit.addEventListener('mouseenter', ev => edgeTip(e, ev))
     e.hit.addEventListener('mousemove', moveTip)
     e.hit.addEventListener('mouseleave', hideTip)
+    e.hit.addEventListener('click', () => openEdge(e))
     eg.append(e.el, e.hit)
   }
   for (const n of g.nodes) {
@@ -299,6 +300,20 @@ function moveTip(ev) {
   tip.style.top = (y + tip.offsetHeight > box.height ? ev.clientY - box.top - tip.offsetHeight - 10 : y) + 'px'
 }
 function hideTip() { tipFor?.el.classList.remove('hot'); tipFor = null; $('#gtip').hidden = true }
+
+// Click an edge: scroll the diff to the import in the importing file
+function openEdge(e) {
+  const line = e.lines?.[0] ?? e.line
+  hideTip()
+  if (!fileSection(e.from)) return toast(`${e.from}:${line} is not part of this PR`)
+  toggleGraph(false)
+  if (!goTo(e.from, line, 0, 1e6, null)) {
+    const sec = fileSection(e.from)
+    sec.classList.remove('folded')
+    navigate(() => sec.scrollIntoView(), null, null, null)
+    toast(`${e.from}:${line} is outside the diff hunks`)
+  }
+}
 
 // ---- highlight / search / detail --------------------------------------------------------------
 function focus(n) {
