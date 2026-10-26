@@ -15,6 +15,8 @@ const NOTES = join(CACHE, 'notes')
 mkdirSync(NOTES, { recursive: true })
 
 const token = crypto.randomUUID().replaceAll('-', '')
+// PR_REVIEW_HOST=0.0.0.0 (or an interface address) exposes the page beyond this machine; the URL token is the only guard
+const HOST = process.env.PR_REVIEW_HOST || '127.0.0.1'
 const out = (o: object) => console.log(JSON.stringify(o))
 
 interface Msg { role: 'user' | 'claude'; text: string; done: boolean }
@@ -173,7 +175,7 @@ const MIME: Record<string, string> = { '.html': 'text/html', '.js': 'text/javasc
 
 const server = Bun.serve({
   port: 0,
-  hostname: '127.0.0.1',
+  hostname: HOST,
   idleTimeout: 0,
   async fetch(req) {
     const url = new URL(req.url)
@@ -314,5 +316,5 @@ async function api(req: Request, url: URL): Promise<Response> {
   return json({ error: 'not found' }, 404)
 }
 
-out({ type: 'ready', port: server.port, token })
+out({ type: 'ready', host: HOST, port: server.port, token })
 process.on('SIGTERM', () => { for (const r of reviews.values()) r.lsp?.dispose(); process.exit(0) })
