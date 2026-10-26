@@ -1,0 +1,11 @@
+{
+  "name": "pr-review-server",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@highlightjs/cdn-assets": "^11.12.0",
+    "highlight.js": "^11.12.0",
+    "marked": "^18.1.1",
+    "material-icon-theme": "^5.39.0"
+  }
+}

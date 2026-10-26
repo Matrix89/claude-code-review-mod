@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR review</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div id="boot"><div><div class="spin"></div><div id="bootmsg">Starting…</div></div></div>
+<div id="app" hidden>
+  <nav id="tree">
+    <input id="filter" placeholder="Filter files…" autocomplete="off">
+    <div id="progress"></div>
+    <div id="lspstat" hidden></div>
+    <div id="files"></div>
+  </nav>
+  <main id="main">
+    <header id="pr"></header>
+    <div id="diff"></div>
+  </main>
+  <aside id="side">
+    <section id="notes">
+      <div class="sh">Scratchpad <span id="notesstate"></span></div>
+      <textarea id="notesbox" placeholder="Notes for this review (saved automatically)…" spellcheck="false"></textarea>
+    </section>
+    <section id="panel">
+      <div class="tabs">
+        <button data-tab="claude" class="on">Claude <i id="askbadge"></i></button>
+        <button data-tab="pending">Pending <i id="pendbadge"></i></button>
+        <button data-tab="jumps">Jumps <i id="jumpbadge"></i></button>
+      </div>
+      <div class="tabbody" id="tab-claude"></div>
+      <div class="tabbody" id="tab-pending" hidden></div>
+      <div class="tabbody" id="tab-jumps" hidden></div>
+    </section>
+  </aside>
+</div>
+<div id="toast" hidden></div>
+<script src="/vendor/marked.js"></script>
+<script src="/vendor/highlight.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
