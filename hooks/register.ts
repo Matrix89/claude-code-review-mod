@@ -1,16 +1,23 @@
 import type { Register } from 'claude-code'
 
-interface Ready { port: number; token: string }
+interface Ready { host: string; port: number; token: string }
 interface Turn { id: string; text: string; step: number; sentAt: number; chain: Promise<unknown> }
 
 // POSTs the reply so far (cumulative), in order, to the review server
 function post($: { process: { run: (argv: readonly string[]) => Promise<unknown> } }, ready: Promise<Ready>, t: Turn, done: boolean) {
   const body = JSON.stringify({ id: t.id, text: t.text, done })
   t.chain = t.chain.then(async () => {
-    const { port, token } = await ready
-    await $.process.run(['curl', '-sS', '-X', 'POST', '-H', `x-token: ${token}`, '-d', body, `http://127.0.0.1:${port}/api/stream`]).catch(() => undefined)
+    const { host, port, token } = await ready
+    await $.process.run(['curl', '-sS', '-X', 'POST', '-H', `x-token: ${token}`, '-d', body, `http://${host}:${port}/api/stream`]).catch(() => undefined)
   })
   return t.chain
+}
+
+// a wildcard bind (PR_REVIEW_HOST=0.0.0.0) is reached through loopback; an IPv6 address needs brackets in a URL
+function connectHost(bound = '127.0.0.1') {
+  if (bound === '0.0.0.0') return '127.0.0.1'
+  if (bound === '::') return '[::1]'
+  return bound.includes(':') ? `[${bound}]` : bound
 }
 
 export const register: Register = on => {
@@ -63,9 +70,9 @@ export const register: Register = on => {
         while ((nl = buf.indexOf('\n')) >= 0) {
           const line = buf.slice(0, nl)
           buf = buf.slice(nl + 1)
-          let msg: { type: string; prompt?: string; port?: number; token?: string }
+          let msg: { type: string; prompt?: string; host?: string; port?: number; token?: string }
           try { msg = JSON.parse(line) } catch { continue }
-          if (msg.type === 'ready') resolveReady({ port: msg.port!, token: msg.token! })
+          if (msg.type === 'ready') resolveReady({ host: connectHost(msg.host), port: msg.port!, token: msg.token! })
           else if (msg.type === 'ask' && msg.prompt) void $.prompt.submit({ text: msg.prompt })
         }
       }
@@ -74,19 +81,19 @@ export const register: Register = on => {
   })
 
   on('tool.call', { tool: 'mcp__pr-review__review_pr' }, async ($, e) => {
-    const { port, token } = await ready
+    const { host, port, token } = await ready
     const { pr = '', cwd: dir } = e as unknown as { pr?: string; cwd?: string }
-    const url = `http://127.0.0.1:${port}/?t=${token}&pr=${encodeURIComponent(pr)}&cwd=${encodeURIComponent(dir || cwd)}`
+    const url = `http://${host}:${port}/?t=${token}&pr=${encodeURIComponent(pr)}&cwd=${encodeURIComponent(dir || cwd)}`
     await $.process.run(['xdg-open', url]).catch(() => undefined)
     return { result: `Opened the review page for ${pr}. Questions from the reviewer will arrive as prompts; answer them in chat and the reply streams into the page. Page: ${url.replace(/t=[^&]+/, 't=…')}` }
   })
 
   on('tool.call', { tool: 'mcp__pr-review__answer' }, async ($, e) => {
-    const { port, token } = await ready
+    const { host, port, token } = await ready
     const { id, text } = e as unknown as { id: string; text: string }
     const r = await $.process.run([
       'curl', '-sS', '-X', 'POST', '-H', `x-token: ${token}`, '-d', JSON.stringify({ id, text }),
-      `http://127.0.0.1:${port}/api/answer`,
+      `http://${host}:${port}/api/answer`,
     ])
     return r.exitCode === 0 && !r.stdout.includes('"error"')
       ? { result: 'Posted.' }

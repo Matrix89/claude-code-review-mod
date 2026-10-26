@@ -38,6 +38,11 @@ credential for github.com (an SSH key, or `gh auth login` then `gh auth setup-gi
 The first start runs `bun install` for the server's two dependencies. The PR head is checked out as a git worktree under
 `~/.cache/pr-review` (your own checkout is reused when you pass its path as `cwd`).
 
+The server listens on `127.0.0.1` only. To open the page from another machine (a dev VM, a box behind a jump host), set
+`PR_REVIEW_HOST` in the environment Claude starts from, e.g. `PR_REVIEW_HOST=0.0.0.0`, or one interface address. Anyone
+who can reach that address and holds the URL's token can read the PR and add comments to your pending review.
+Set `PR_REVIEW_PORT` too to keep the same port across restarts, so an ssh tunnel to it stays valid.
+
 ## Use
 
 Ask Claude to review a PR (`owner/repo#12`, a PR URL, or a number inside a checkout). Questions asked in the page
