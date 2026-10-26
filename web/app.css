@@ -197,6 +197,7 @@ body.dragging { cursor: ns-resize; user-select: none; }
 /* ---- dependency graph overlay ---- */
 #graphbtn { width: 100%; margin-bottom: 6px; text-align: left; }
 #graphbtn.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--panel)); }
+#graph[hidden] { display: none; }
 #graph { position: fixed; top: 0; left: 0; bottom: 0; right: 380px; z-index: 15; background: var(--bg); display: flex; flex-direction: column; border-right: 1px solid var(--line); }
 #gbar { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
 #gbar select { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
@@ -228,3 +229,5 @@ body.dragging { cursor: ns-resize; user-select: none; }
 #gdetail .gl:hover { text-decoration: underline; }
 #gdetail .gd { padding-left: 8px; font-family: var(--mono); }
 #gdetail .gopen { margin-top: 8px; }
+#gsvg:not(.zoomed) .gnode:not(.changed) text { display: none; }
+#gsvg:not(.zoomed) .gnode.near text, #gsvg:not(.zoomed) .gnode.sel text, #gsvg:not(.zoomed) .gnode.hit text { display: block; }

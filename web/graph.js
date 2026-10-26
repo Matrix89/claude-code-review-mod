@@ -61,7 +61,7 @@ function draw() {
   const capped = list.length > MAX_NODES
   if (capped) list = list.sort((a, b) => b.changed - a.changed || b.lines - a.lines).slice(0, MAX_NODES)
   const byPath = new Map(list.map((n, i) => {
-    const a = (i / list.length) * Math.PI * 2, r = 40 + Math.sqrt(list.length) * 14
+    const a = (i / list.length) * Math.PI * 2, r = 80 + Math.sqrt(list.length) * 40
     return [n.path, { ...n, group: groupOf(n.path), x: Math.cos(a) * r, y: Math.sin(a) * r, vx: 0, vy: 0, r: 5 + Math.min(14, Math.sqrt(n.lines) / 3) }]
   }))
   const edges = gData.edges.filter(e => byPath.has(e.from) && byPath.has(e.to)).map(e => ({ ...e, a: byPath.get(e.from), b: byPath.get(e.to) }))
@@ -101,7 +101,7 @@ function draw() {
   $('#gdetail').hidden = true
   gView = { x: 0, y: 0, k: 1 }
   applySearch()
-  settle()
+  settle(260, true)
 }
 
 // ---- layout -----------------------------------------------------------------------------
@@ -114,9 +114,9 @@ function step() {
     for (let j = i + 1; j < nodes.length; j++) {
       const q = nodes[j]
       let dx = p.x - q.x, dy = p.y - q.y, d2 = dx * dx + dy * dy
-      if (d2 > 250_000) continue
+      if (d2 > 640_000) continue
       if (d2 < 1) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d2 = 1 }
-      const d = Math.sqrt(d2), f = (1800 / d2) * a, min = p.r + q.r + 14
+      const d = Math.sqrt(d2), f = (7000 / d2) * a, min = p.r + q.r + 40
       const push = d < min ? (min - d) * 0.05 : 0
       p.vx += (dx / d) * (f + push); p.vy += (dy / d) * (f + push)
       q.vx -= (dx / d) * (f + push); q.vy -= (dy / d) * (f + push)
@@ -124,7 +124,7 @@ function step() {
   }
   for (const e of edges) {
     const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y, d = Math.hypot(dx, dy) || 1
-    const f = (d - (60 + e.a.r + e.b.r)) * 0.012 * a
+    const f = (d - (120 + e.a.r + e.b.r)) * 0.01 * a
     e.a.vx += (dx / d) * f; e.a.vy += (dy / d) * f; e.b.vx -= (dx / d) * f; e.b.vy -= (dy / d) * f
   }
   for (const n of nodes) {
@@ -147,7 +147,7 @@ function place() {
   for (const n of g.nodes) n.el.setAttribute('transform', `translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})`)
 }
 
-function settle(ticks = 220) {
+function settle(ticks = 260, refit = false) {
   cancelAnimationFrame(g.raf)
   const mine = g
   let left = ticks
@@ -155,20 +155,20 @@ function settle(ticks = 220) {
     if (g !== mine) return
     for (let i = 0; i < 3 && left > 0; i++, left--) step()
     place()
-    if (left === ticks - 3) fit()
-    if (left > 0) mine.raf = requestAnimationFrame(loop); else fit(true)
+    if (refit && left === ticks - 3) fit()
+    if (left > 0) mine.raf = requestAnimationFrame(loop); else if (refit) fit()
   }
   loop()
 }
 
 // ---- view ---------------------------------------------------------------------------------
-function applyView() { $('#gvp').setAttribute('transform', `translate(${gView.x} ${gView.y}) scale(${gView.k})`) }
-function fit(smooth) {
+function applyView() { $('#gsvg').classList.toggle('zoomed', gView.k >= 0.9); $('#gvp').setAttribute('transform', `translate(${gView.x} ${gView.y}) scale(${gView.k})`) }
+function fit() {
   const box = $('#gsvg').getBoundingClientRect(), ns = g.nodes
   if (!ns.length) return
   const x0 = Math.min(...ns.map(n => n.x - n.r)), x1 = Math.max(...ns.map(n => n.x + n.r + 30))
   const y0 = Math.min(...ns.map(n => n.y - n.r)), y1 = Math.max(...ns.map(n => n.y + n.r + 16))
-  const k = Math.min(2, Math.min(box.width / (x1 - x0 || 1), box.height / (y1 - y0 || 1)) * 0.92)
+  const k = Math.min(1.6, Math.min(box.width / (x1 - x0 || 1), box.height / (y1 - y0 || 1)) * 0.92)
   gView = { k, x: box.width / 2 - ((x0 + x1) / 2) * k, y: box.height / 2 - ((y0 + y1) / 2) * k }
   applyView()
 }
