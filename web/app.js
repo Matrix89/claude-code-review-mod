@@ -427,9 +427,9 @@ addEventListener('mousedown', clearMark)
 addEventListener('keydown', clearMark)
 
 // `from`: the symbol we leave (marked again on Back); `to`: the symbol we land on
-function navigate(go, row, from, to) {
+function navigate(go, row, from, to, keepCurrent = false) {
   const main = $('#main')
-  history.replaceState({ y: main.scrollTop, mark: from }, '', location.href)   // where we were, so Back returns here
+  if (!keepCurrent) history.replaceState({ y: main.scrollTop, mark: from }, '', location.href)   // where we were, so Back returns here
   go()
   history.pushState({ y: main.scrollTop, mark: to }, '', location.href)
   if (row) flashRow(row)
@@ -437,7 +437,9 @@ function navigate(go, row, from, to) {
 }
 addEventListener('popstate', e => {
   const st = e.state
-  if (!st || !S) return
+  if (!S) return
+  if (!!st?.graph === $('#graph').hidden) toggleGraph(!!st?.graph, true)   // Back/Forward across the graph overlay
+  if (!st || st.graph) return
   $('#main').scrollTop = st.y
   markSymbol(st.mark)
 })
@@ -796,13 +798,13 @@ async function peekLoc(el, before = 4, after = 4, toggle = true) {
 }
 
 // Scrolls to a line of the diff (marking the symbol there); false if that line is not rendered
-function goTo(p, l, c0, c1, from) {
+function goTo(p, l, c0, c1, from, keepCurrent = false) {
   const sec = fileSection(p)
   const target = sec?.querySelector(`.r[data-n="${l}"]`)
   if (!target) return false
   hidePop()
   sec.classList.remove('folded')
-  navigate(() => target.scrollIntoView({ block: 'center' }), target, from, { path: p, line: l, c0, c1 })
+  navigate(() => target.scrollIntoView({ block: 'center' }), target, from, { path: p, line: l, c0, c1 }, keepCurrent)
   return true
 }
 

@@ -14,7 +14,7 @@ const hue = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) 
 const baseName = p => p.slice(p.lastIndexOf('/') + 1)
 
 function initGraph() {
-  $('#graphbtn').onclick = toggleGraph
+  $('#graphbtn').onclick = () => toggleGraph()
   addEventListener('keydown', e => {
     if (e.key === 'Escape' && !$('#graph').hidden) { e.preventDefault(); toggleGraph(false) }
     if (e.key === 'g' && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName) && !document.activeElement?.isContentEditable) toggleGraph()
@@ -24,10 +24,21 @@ function initGraph() {
   $('#gfit').onclick = () => g && fit()
 }
 
-async function toggleGraph(open = $('#graph').hidden) {
+// The overlay is a history entry: Back from the source it led to returns here, Esc/the button go back out
+function setGraphShown(open) {
   $('#graph').hidden = !open
   $('#graphbtn').classList.toggle('on', open)
-  if (!open || gData) { if (open) draw(); return }
+}
+async function toggleGraph(open = $('#graph').hidden, fromHistory = false) {
+  if (open === !$('#graph').hidden) return
+  if (!open && !fromHistory && history.state?.graph) return history.back()
+  if (open && !fromHistory) {
+    history.replaceState({ ...history.state, y: $('#main').scrollTop }, '', location.href)
+    history.pushState({ graph: true }, '', location.href)
+  }
+  setGraphShown(open)
+  if (!open || g) return   // keep the layout and view when coming back
+  if (gData) { draw(); return }
   $('#gstat').textContent = 'Parsing the repository with tree-sitter…'
   gLoading ??= rapi('graph').then(d => { gData = d }).catch(e => { gLoading = null; $('#gstat').textContent = 'Failed: ' + e.message })
   await gLoading
@@ -306,11 +317,11 @@ function openEdge(e) {
   const line = e.lines?.[0] ?? e.line
   hideTip()
   if (!fileSection(e.from)) return toast(`${e.from}:${line} is not part of this PR`)
-  toggleGraph(false)
-  if (!goTo(e.from, line, 0, 1e6, null)) {
+  setGraphShown(false)
+  if (!goTo(e.from, line, 0, 1e6, null, true)) {
     const sec = fileSection(e.from)
     sec.classList.remove('folded')
-    navigate(() => sec.scrollIntoView(), null, null, null)
+    navigate(() => sec.scrollIntoView(), null, null, null, true)
     toast(`${e.from}:${line} is outside the diff hunks`)
   }
 }
@@ -349,9 +360,9 @@ function select(n) {
   box.querySelector('.gopen')?.addEventListener('click', () => {
     const sec = fileSection(n.path)
     if (!sec) return
-    toggleGraph(false)
+    setGraphShown(false)
     sec.classList.remove('folded')
-    navigate(() => sec.scrollIntoView(), null, null, null)
+    navigate(() => sec.scrollIntoView(), null, null, null, true)
   })
   box.onclick = e => {
     const a = e.target.closest('.gl'); if (!a) return
