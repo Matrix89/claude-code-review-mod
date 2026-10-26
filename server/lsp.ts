@@ -56,6 +56,7 @@ const SERVERS: Record<string, { bins: string[][]; exts: Record<string, string>; 
   cpp: { bins: [['clangd']], exts: { c: 'c', h: 'c', cc: 'cpp', cpp: 'cpp', hpp: 'cpp' } },
   java: { bins: [['jdtls']], exts: { java: 'java' } },
   lua: { bins: [['lua-language-server']], exts: { lua: 'lua' } },
+  php: { bins: [['intelephense', '--stdio'], ['phpactor', 'language-server']], exts: { php: 'php' } },
 }
 
 const METHODS: Record<LspKind, string> = {
@@ -115,13 +116,15 @@ class Client {
   private initDone = false
   readonly rootUri: string
   readonly progress = new Map<string, { title: string; message?: string; percentage?: number }>()
-  quiescent: boolean // rust-analyzer reports it via experimental/serverStatus; others are always quiet
+  quiescent: boolean // rust-analyzer reports it via experimental/serverStatus, intelephense by ending its scan; others are always quiet
+  private scanEndsWithProgress: boolean
   readonly opened = new Set<string>()
   dead = false
   ready: Promise<void>
 
   constructor(readonly root: string, cmd: string[], options?: object) {
-    this.quiescent = !cmd[0].includes('rust-analyzer')
+    this.scanEndsWithProgress = cmd[0].includes('intelephense')
+    this.quiescent = !/rust-analyzer|intelephense/.test(cmd[0])
     this.rootUri = pathToFileURL(root).href
     this.proc = Bun.spawn(cmd, { cwd: root, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
     this.pump()
@@ -206,6 +209,9 @@ class Client {
     if (m.method !== undefined && m.id !== undefined) return this.reply(m)
     if (m.method !== undefined) {
       if (m.method === 'experimental/serverStatus') this.quiescent = !!m.params?.quiescent
+      // intelephense brackets its workspace scan with these, or with $/progress when the client supports it
+      if (m.method === 'indexingStarted') this.quiescent = false
+      if (m.method === 'indexingEnded') this.quiescent = true
       if (m.method === '$/progress') {
         const token = String(m.params?.token)
         const v = m.params?.value
@@ -214,7 +220,10 @@ class Client {
           const cur = this.progress.get(token)
           if (cur) this.progress.set(token, { ...cur, message: v.message ?? cur.message, percentage: v.percentage ?? cur.percentage })
         }
-        if (v?.kind === 'end') this.progress.delete(token)
+        if (v?.kind === 'end') {
+          this.progress.delete(token)
+          if (this.scanEndsWithProgress && !this.progress.size) this.quiescent = true
+        }
       }
       return
     }

@@ -96,3 +96,48 @@ describe('rust-analyzer', () => {
     60_000,
   )
 })
+
+const BUDGET_GUARD_MS = 20_000 // under LspManager's 25s per-query budget: the scan's end was noticed, not timed out
+
+describe('intelephense', () => {
+  test.skipIf(!Bun.which('intelephense'))(
+    'definition of a class used in another file',
+    async () => {
+      const root = mkdtempSync(join(tmpdir(), 'lsp-php-'))
+      const m = new LspManager(root)
+      try {
+        writeFileSync(join(root, 'A.php'), '<?php\nclass Widget { public function spin(): int { return 1; } }\n')
+        writeFileSync(join(root, 'b.php'), '<?php\n$w = new Widget();\n$w->spin();\n')
+        const t0 = Date.now()
+        let r = await m.query('definition', 'b.php', 2, 11)
+        while (r.status === 'indexing' && Date.now() - t0 < 30_000) r = await m.query('definition', 'b.php', 2, 11)
+        expect(r.status).toBe('ok')
+        expect(r.locations).toEqual([expect.objectContaining({ path: 'A.php', line: 2 })])
+      } finally {
+        m.dispose()
+        rmSync(root, { recursive: true, force: true })
+      }
+    },
+    60_000,
+  )
+
+  test.skipIf(!Bun.which('intelephense'))(
+    'a position with no symbol is ok and empty once the scan ends',
+    async () => {
+      const root = mkdtempSync(join(tmpdir(), 'lsp-php-'))
+      const m = new LspManager(root)
+      try {
+        writeFileSync(join(root, 'a.php'), '<?php\n$x = 1;\n')
+        const t0 = Date.now()
+        let r = await m.query('definition', 'a.php', 2, 7)
+        while (r.status === 'indexing' && Date.now() - t0 < 30_000) r = await m.query('definition', 'a.php', 2, 7)
+        expect(r).toEqual({ status: 'ok', locations: [] })
+        expect(Date.now() - t0).toBeLessThan(BUDGET_GUARD_MS)
+      } finally {
+        m.dispose()
+        rmSync(root, { recursive: true, force: true })
+      }
+    },
+    60_000,
+  )
+})

@@ -874,8 +874,10 @@ function showProgress(w, st, x, y) {
   pop.onclick = null
 }
 // Shows live indexing progress in the popover until every server is ready; false if the hover moved on meanwhile
+// keep in step with SERVERS in server/lsp.ts: an extension missing here waits out the empty-status polls on every click
 const SERVER_OF = { rs: 'rust-analyzer', ts: 'typescript-language-server', tsx: 'typescript-language-server', js: 'typescript-language-server', jsx: 'typescript-language-server',
-  py: 'pyright|pylsp', go: 'gopls', c: 'clangd', h: 'clangd', cc: 'clangd', cpp: 'clangd', hpp: 'clangd' }
+  mjs: 'typescript-language-server', cjs: 'typescript-language-server', py: 'pyright|pylsp', go: 'gopls', c: 'clangd', h: 'clangd', cc: 'clangd', cpp: 'clangd', hpp: 'clangd',
+  java: 'jdtls', lua: 'lua-language-server', php: 'intelephense|phpactor' }
 async function lspReady(w, seq, x, y) {
   const re = new RegExp(SERVER_OF[w.path.split('.').pop()] || '^$')
   for (let empty = 0; ; ) {

@@ -7,7 +7,7 @@ server and opens the page.
   PRs of 10k+ lines.
 - Inline comments and `suggestion` blocks, added to your **pending** GitHub review; drag across line numbers for ranges.
 - "Ask Claude" opens a streaming chat under the line, answered by the Claude session that opened the page.
-- Language-server intelligence (rust-analyzer, typescript-language-server, pyright, gopls, clangd): click a symbol for
+- Language-server intelligence (rust-analyzer, typescript-language-server, pyright, gopls, clangd, intelephense): click a symbol for
   docs, definition, trait declaration and references, hover to highlight usages, a Jumps tab to get back.
 - File-type icons, per-file comment counts, and the "Viewed" checkbox synced with GitHub.
 - An always-visible scratchpad for notes.
