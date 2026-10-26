@@ -92,7 +92,7 @@ function draw() {
     e.hit.addEventListener('mouseenter', ev => edgeTip(e, ev))
     e.hit.addEventListener('mousemove', moveTip)
     e.hit.addEventListener('mouseleave', hideTip)
-    e.hit.addEventListener('click', () => openEdge(e))
+    e.hit.__e = e
     eg.append(e.el, e.hit)
   }
   for (const n of g.nodes) {
@@ -259,12 +259,12 @@ function initGraphInput() {
     applyView()
   }, { passive: false })
   svg.addEventListener('pointerdown', e => {
-    const hit = e.target.closest('.gnode')?.__n
+    const hit = e.target.closest('.gnode')?.__n, edge = e.target.closest('.gehit')?.__e
     const sx = e.clientX, sy = e.clientY, ox = gView.x, oy = gView.y
     let moved = false
     svg.setPointerCapture(e.pointerId)
     const move = ev => { moved ||= Math.hypot(ev.clientX - sx, ev.clientY - sy) > 3; gView.x = ox + ev.clientX - sx; gView.y = oy + ev.clientY - sy; applyView() }
-    const up = () => { svg.removeEventListener('pointermove', move); svg.removeEventListener('pointerup', up); if (!moved) select(hit ?? null) }
+    const up = () => { svg.removeEventListener('pointermove', move); svg.removeEventListener('pointerup', up); if (moved) return; if (edge) openEdge(edge); else select(hit ?? null) }
     svg.addEventListener('pointermove', move); svg.addEventListener('pointerup', up)
   })
 }
