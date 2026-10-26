@@ -70,7 +70,8 @@ function draw() {
     ;(out.get(e.from) ?? out.set(e.from, []).get(e.from)).push(e)
     ;(inn.get(e.to) ?? inn.set(e.to, []).get(e.to)).push(e)
   }
-  g = { nodes: [...byPath.values()], edges, byPath, out, inn, sel: null, raf: 0, alpha: 1 }
+  g = { nodes: [...byPath.values()], edges, byPath, out, inn, sel: null, raf: 0, alpha: 1, boxes: [] }
+  buildBoxes()
   const groups = [...new Set(g.nodes.map(n => n.group))]
   const svg = $('#gsvg')
   svg.replaceChildren()
@@ -78,7 +79,13 @@ function draw() {
   defs.innerHTML = `<marker id="garrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker>`
   const vp = svgEl('g', { id: 'gvp' })
   const eg = svgEl('g', { class: 'ge' }), ng = svgEl('g', { class: 'gn' })
-  vp.append(eg, ng); svg.append(defs, vp)
+  const bg = svgEl('g', { class: 'gb' })
+  for (const b of g.boxes) {
+    b.rect = svgEl('rect', { rx: 10, class: 'gbox', style: `--h:${hue(b.top)}` })
+    b.label = svgEl('text', { class: 'gboxl', style: `--h:${hue(b.top)}` }); b.label.textContent = b.label0 + '/'
+    bg.append(b.rect, b.label)
+  }
+  vp.append(bg, eg, ng); svg.append(defs, vp)
   for (const e of edges) {
     e.el = svgEl('line', { 'marker-end': 'url(#garrow)', class: 'gedge ' + e.kind })
     const t = svgEl('title'); t.textContent = `${baseName(e.from)} → ${baseName(e.to)} (${e.kind}${e.names.length ? ': ' + e.names.join(', ') : ''})`
@@ -104,11 +111,38 @@ function draw() {
   settle(260, true)
 }
 
+// Folder hulls: every folder holding a distinct set of the drawn files; a chain of folders with the same files is one hull
+function buildBoxes() {
+  const dirs = new Map()
+  for (const n of g.nodes) {
+    const parts = n.path.split('/').slice(0, -1)
+    n.dir = parts.join('/'); n.boxes = []
+    for (let i = 1; i <= parts.length; i++) {
+      const d = parts.slice(0, i).join('/')
+      ;(dirs.get(d) ?? dirs.set(d, []).get(d)).push(n)
+    }
+  }
+  const kept = []
+  for (const [d, nodes] of [...dirs].sort((a, b) => a[0].length - b[0].length)) {
+    const parts = d.split('/')
+    let parent = ''   // nearest ancestor that already has a hull
+    for (let i = parts.length - 1; i >= 1; i--) { const a = parts.slice(0, i).join('/'); if (kept.some(k => k.dir === a)) { parent = a; break } }
+    const pk = kept.find(k => k.dir === parent)
+    if (pk && pk.nodes.length === nodes.length) { pk.dir = d; pk.label0 = d.slice(pk.base.length + 1) ; continue }   // same files: extend the hull's name
+    kept.push({ dir: d, base: parent, nodes, label0: parent ? d.slice(parent.length + 1) : d, top: parts[0] })
+  }
+  // a hull spanning everything adds nothing
+  g.boxes = kept.filter(b => b.nodes.length < g.nodes.length)
+  // depth of nesting below each hull
+  const depth = b => 1 + Math.max(-1, ...g.boxes.filter(c => c !== b && c.dir.startsWith(b.dir + '/')).map(depth))
+  for (const b of g.boxes) b.height = Math.max(0, depth(b))
+  for (const n of g.nodes) n.boxes = g.boxes.filter(b => b.nodes.includes(n))
+}
+
 // ---- layout -----------------------------------------------------------------------------
 function step() {
   const { nodes, edges } = g, a = g.alpha
-  const cent = new Map()
-  for (const n of nodes) { const c = cent.get(n.group) ?? cent.set(n.group, { x: 0, y: 0, k: 0 }).get(n.group); c.x += n.x; c.y += n.y; c.k++ }
+  for (const b of g.boxes) { b.cx = b.cy = 0; for (const n of b.nodes) { b.cx += n.x; b.cy += n.y } b.cx /= b.nodes.length; b.cy /= b.nodes.length }
   for (let i = 0; i < nodes.length; i++) {
     const p = nodes[i]
     for (let j = i + 1; j < nodes.length; j++) {
@@ -116,7 +150,7 @@ function step() {
       let dx = p.x - q.x, dy = p.y - q.y, d2 = dx * dx + dy * dy
       if (d2 > 640_000) continue
       if (d2 < 1) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d2 = 1 }
-      const d = Math.sqrt(d2), f = (7000 / d2) * a, min = p.r + q.r + 40
+      const d = Math.sqrt(d2), f = (7000 / d2) * a * (p.dir === q.dir ? 1 : 1.8), min = p.r + q.r + (p.dir === q.dir ? 40 : 70)
       const push = d < min ? (min - d) * 0.05 : 0
       p.vx += (dx / d) * (f + push); p.vy += (dy / d) * (f + push)
       q.vx -= (dx / d) * (f + push); q.vy -= (dy / d) * (f + push)
@@ -128,9 +162,8 @@ function step() {
     e.a.vx += (dx / d) * f; e.a.vy += (dy / d) * f; e.b.vx -= (dx / d) * f; e.b.vy -= (dy / d) * f
   }
   for (const n of nodes) {
-    const c = cent.get(n.group)
-    n.vx += ((c.x / c.k) - n.x) * 0.01 * a - n.x * 0.002 * a
-    n.vy += ((c.y / c.k) - n.y) * 0.01 * a - n.y * 0.002 * a
+    n.vx -= n.x * 0.002 * a; n.vy -= n.y * 0.002 * a
+    for (const b of n.boxes) { n.vx += (b.cx - n.x) * 0.012 * a; n.vy += (b.cy - n.y) * 0.012 * a }
     if (n.fixed) { n.vx = n.vy = 0; continue }
     n.vx *= 0.82; n.vy *= 0.82
     n.x += n.vx; n.y += n.vy
@@ -143,6 +176,14 @@ function place() {
     const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y, d = Math.hypot(dx, dy) || 1
     e.el.setAttribute('x1', e.a.x + (dx / d) * e.a.r); e.el.setAttribute('y1', e.a.y + (dy / d) * e.a.r)
     e.el.setAttribute('x2', e.b.x - (dx / d) * (e.b.r + 2)); e.el.setAttribute('y2', e.b.y - (dy / d) * (e.b.r + 2))
+  }
+  for (const b of g.boxes) {
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9
+    for (const n of b.nodes) { x0 = Math.min(x0, n.x - n.r); x1 = Math.max(x1, n.x + n.r); y0 = Math.min(y0, n.y - n.r); y1 = Math.max(y1, n.y + n.r + 12) }
+    const pad = 20 + 16 * b.height
+    b.rect.setAttribute('x', x0 - pad); b.rect.setAttribute('y', y0 - pad - 14)
+    b.rect.setAttribute('width', x1 - x0 + 2 * pad); b.rect.setAttribute('height', y1 - y0 + 2 * pad + 14)
+    b.label.setAttribute('x', x0 - pad + 8); b.label.setAttribute('y', y0 - pad + 3)
   }
   for (const n of g.nodes) n.el.setAttribute('transform', `translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})`)
 }
@@ -166,8 +207,9 @@ function applyView() { $('#gsvg').classList.toggle('zoomed', gView.k >= 0.9); $(
 function fit() {
   const box = $('#gsvg').getBoundingClientRect(), ns = g.nodes
   if (!ns.length) return
-  const x0 = Math.min(...ns.map(n => n.x - n.r)), x1 = Math.max(...ns.map(n => n.x + n.r + 30))
-  const y0 = Math.min(...ns.map(n => n.y - n.r)), y1 = Math.max(...ns.map(n => n.y + n.r + 16))
+  const m = 24 + 16 * Math.max(0, ...g.boxes.map(b => b.height))
+  const x0 = Math.min(...ns.map(n => n.x - n.r)) - m, x1 = Math.max(...ns.map(n => n.x + n.r + 30)) + m
+  const y0 = Math.min(...ns.map(n => n.y - n.r)) - m - 14, y1 = Math.max(...ns.map(n => n.y + n.r + 16)) + m
   const k = Math.min(1.6, Math.min(box.width / (x1 - x0 || 1), box.height / (y1 - y0 || 1)) * 0.92)
   gView = { k, x: box.width / 2 - ((x0 + x1) / 2) * k, y: box.height / 2 - ((y0 + y1) / 2) * k }
   applyView()

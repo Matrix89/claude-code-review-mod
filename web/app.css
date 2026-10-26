@@ -231,3 +231,6 @@ body.dragging { cursor: ns-resize; user-select: none; }
 #gdetail .gopen { margin-top: 8px; }
 #gsvg:not(.zoomed) .gnode:not(.changed) text { display: none; }
 #gsvg:not(.zoomed) .gnode.near text, #gsvg:not(.zoomed) .gnode.sel text, #gsvg:not(.zoomed) .gnode.hit text { display: block; }
+.gbox { fill: hsl(var(--h) 60% 55% / 0.06); stroke: hsl(var(--h) 50% 55% / 0.5); stroke-width: 1.2; stroke-dasharray: 5 4; pointer-events: none; }
+.gboxl { font: 600 11px var(--mono); fill: hsl(var(--h) 45% 55%); pointer-events: none; }
+#gsvg.focus .gbox, #gsvg.focus .gboxl { opacity: 0.5; }
