@@ -97,7 +97,7 @@ function draw() {
     const t = svgEl('text', { y: n.r + 11 }); t.textContent = baseName(n.path)
     const ti = svgEl('title'); ti.textContent = n.path + (n.changed ? `  +${n.additions} −${n.deletions}` : '')
     n.el.append(c, t, ti); ng.append(n.el)
-    n.el.addEventListener('pointerdown', ev => dragNode(ev, n))
+    n.el.__n = n
     n.el.addEventListener('mouseenter', () => { if (!g.sel) focus(n) })
     n.el.addEventListener('mouseleave', () => { if (!g.sel) focus(null) })
   }
@@ -164,7 +164,6 @@ function step() {
   for (const n of nodes) {
     n.vx -= n.x * 0.002 * a; n.vy -= n.y * 0.002 * a
     for (const b of n.boxes) { n.vx += (b.cx - n.x) * 0.012 * a; n.vy += (b.cy - n.y) * 0.012 * a }
-    if (n.fixed) { n.vx = n.vy = 0; continue }
     n.vx *= 0.82; n.vy *= 0.82
     n.x += n.vx; n.y += n.vy
   }
@@ -186,7 +185,7 @@ function boxRects() {
 function separate() {
   boxRects()
   const bs = g.boxes
-  const move = (nodes, dx, dy) => { for (const n of nodes) if (!n.fixed) { n.x += dx; n.y += dy } }
+  const move = (nodes, dx, dy) => { for (const n of nodes) { n.x += dx; n.y += dy } }
   for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
     const a = bs[i], b = bs[j]
     if (a.dir.startsWith(b.dir + '/') || b.dir.startsWith(a.dir + '/')) continue
@@ -200,7 +199,6 @@ function separate() {
     if (n.boxes.includes(b) || n.x + n.r < b.x0 || n.x - n.r > b.x1 || n.y + n.r < b.y0 || n.y - n.r > b.y1) continue
     // push the stranger out through the nearest side
     const l = n.x - b.x0, rr = b.x1 - n.x, t = n.y - b.y0, bt = b.y1 - n.y, m = Math.min(l, rr, t, bt)
-    if (n.fixed) continue
     if (m === l) n.x = b.x0 - n.r - 4; else if (m === rr) n.x = b.x1 + n.r + 4; else if (m === t) n.y = b.y0 - n.r - 4; else n.y = b.y1 + n.r + 4
   }
 }
@@ -257,33 +255,14 @@ function initGraphInput() {
     applyView()
   }, { passive: false })
   svg.addEventListener('pointerdown', e => {
-    if (e.target.closest('.gnode')) return
+    const hit = e.target.closest('.gnode')?.__n
     const sx = e.clientX, sy = e.clientY, ox = gView.x, oy = gView.y
     let moved = false
     svg.setPointerCapture(e.pointerId)
     const move = ev => { moved ||= Math.hypot(ev.clientX - sx, ev.clientY - sy) > 3; gView.x = ox + ev.clientX - sx; gView.y = oy + ev.clientY - sy; applyView() }
-    const up = () => { svg.removeEventListener('pointermove', move); svg.removeEventListener('pointerup', up); if (!moved) select(null) }
+    const up = () => { svg.removeEventListener('pointermove', move); svg.removeEventListener('pointerup', up); if (!moved) select(hit ?? null) }
     svg.addEventListener('pointermove', move); svg.addEventListener('pointerup', up)
   })
-}
-
-function dragNode(e, n) {
-  e.stopPropagation()
-  const sx = e.clientX, sy = e.clientY, ox = n.x, oy = n.y
-  let moved = false
-  const el = $('#gsvg')
-  el.setPointerCapture(e.pointerId)
-  const move = ev => {
-    if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) return
-    if (!moved) { moved = true; n.fixed = true; g.alpha = 0.3; settle(120) }
-    n.x = ox + (ev.clientX - sx) / gView.k; n.y = oy + (ev.clientY - sy) / gView.k
-  }
-  const up = () => {
-    el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up)
-    n.fixed = false
-    if (!moved) select(n)
-  }
-  el.addEventListener('pointermove', move); el.addEventListener('pointerup', up)
 }
 
 // ---- highlight / search / detail --------------------------------------------------------------
