@@ -16,6 +16,8 @@ async function api(path, opts = {}) {
 }
 const rapi = (p, o) => api(`/api/r/${encodeURIComponent(key)}/${p}`, o)
 const post = (p, body, method = 'POST') => rapi(p, { method, body: JSON.stringify(body) })
+// a language-server query about the symbol `w` ({ path, line, a })
+const lsp = (kind, w) => rapi(`lsp?kind=${kind}&path=${encodeURIComponent(w.path)}&line=${w.line}&col=${w.a + 1}`)
 
 let toastTimer
 function toast(msg) {
@@ -123,6 +125,13 @@ function init() {
 }
 
 // ---- file tree -------------------------------------------------------------
+function setFolder(td, closed) {
+  const h = td.querySelector(':scope > .tdh')
+  td.classList.toggle('closed', closed)
+  h.querySelector('.car').textContent = closed ? '▸' : '▾'
+  h.querySelector('.fi').src = iconSrc(folderIcon(h.dataset.name, !closed))
+}
+
 function renderTree() {
   const root = { dirs: new Map(), files: [] }
   S.files.forEach((f, i) => {
@@ -141,23 +150,31 @@ function renderTree() {
     return [a, d]
   }
   const stat = (a, d) => `<span class="st"><span class="a">+${a}</span> <span class="d">−${d}</span></span>`
+  const fileRow = ({ f, i, name }) =>
+    `<div class="ti ${f.status}${viewed.has(f.path) ? ' viewed' : ''}" data-i="${i}" title="${esc(f.path)}">
+      ${img(fileIcon(f.path))}<span class="p">${esc(name)}</span><span class="cc"></span>${stat(f.additions, f.deletions)}</div>`
+  const byName = (x, y) => x.name.localeCompare(y.name)
   const render = n => {
     let html = ''
     for (const [name, child] of [...n.dirs].sort((x, y) => x[0].localeCompare(y[0]))) {
+      // a folder whose only item is one sub-folder folds into it ("firmware/crates"); a file in it stops the fold
       let label = name, c = child
       while (c.files.length === 0 && c.dirs.size === 1) { const [k, v] = [...c.dirs][0]; label += '/' + k; c = v }
       html += `<div class="td"><div class="tdh" data-name="${esc(label)}"><span class="car">▾</span>${img(folderIcon(label, true))}<span class="p">${esc(label)}/</span>${stat(...sum(c))}</div><div class="tdc">${render(c)}</div></div>`
     }
-    for (const { f, i, name } of n.files.sort((x, y) => x.name.localeCompare(y.name))) {
-      html += `<div class="ti ${f.status}${viewed.has(f.path) ? ' viewed' : ''}" data-i="${i}" title="${esc(f.path)}">
-        ${img(fileIcon(f.path))}<span class="p">${esc(name)}</span><span class="cc"></span>${stat(f.additions, f.deletions)}</div>`
-    }
+    for (const f of n.files.sort(byName)) html += fileRow(f)
     return html
   }
   $('#files').innerHTML = render(root)
   $('#files').onclick = e => {
     const h = e.target.closest('.tdh')
-    if (h) { const td = h.parentElement; td.classList.toggle('closed'); const closed = td.classList.contains('closed'); h.querySelector('.car').textContent = closed ? '▸' : '▾'; h.querySelector('.fi').src = iconSrc(folderIcon(h.dataset.name, !closed)); return }
+    if (h) {
+      const td = h.parentElement
+      const closing = !td.classList.contains('closed')
+      setFolder(td, closing)
+      if (closing) td.querySelectorAll('.td').forEach(d => setFolder(d, true))   // collapsing a branch closes everything inside it too
+      return
+    }
     const t = e.target.closest('.ti'); if (!t) return
     const sec = $('#f' + t.dataset.i)
     sec.classList.remove('folded')
@@ -349,12 +366,7 @@ addEventListener('mouseup', e => {
 })
 let suppressClick = false
 addEventListener('click', e => { if (suppressClick) { e.stopPropagation(); suppressClick = false } }, true)
-addEventListener('keydown', e => {
-  if (e.key === 'Control' || e.key === 'Meta') document.body.classList.add('mod')
-  if (e.key === 'Escape') closeComposer()
-})
-addEventListener('keyup', e => { if (e.key === 'Control' || e.key === 'Meta') document.body.classList.remove('mod') })
-addEventListener('blur', () => document.body.classList.remove('mod'))
+addEventListener('keydown', e => { if (e.key === 'Escape') closeComposer() })
 
 // ---- history: back/forward (mouse buttons, Alt+←/→) walk through jumps ----------
 function flashRow(row) {
@@ -399,7 +411,7 @@ let markTimer
 function clearMark() { clearTimeout(markTimer); window.CSS?.highlights?.delete('sym') }
 function markSymbol(m) {
   if (!m) return
-  const sec = [...document.querySelectorAll('.file')].find(f => S.files[f.dataset.i].path === m.path)
+  const sec = fileSection(m.path)
   const row = sec?.querySelector(`.r[data-n="${m.line}"]`)
   if (!row) return
   const code = row.querySelector('code')
@@ -431,10 +443,10 @@ addEventListener('popstate', e => {
 
 // ---- comments --------------------------------------------------------------
 const fileOf = el => S.files[el.closest('.file').dataset.i]
-const lineOf = row => row.classList.contains('del') ? { side: 'LEFT', line: +row.dataset.o } : { side: 'RIGHT', line: +row.dataset.n }
+const fileSection = path => [...document.querySelectorAll('.file')].find(s => S.files[s.dataset.i].path === path)
 
 function rowFor(c) {
-  const sec = [...document.querySelectorAll('.file')].find(s => S.files[s.dataset.i].path === c.path)
+  const sec = fileSection(c.path)
   if (!sec || c.line == null) return null
   const sel = c.side === 'LEFT' ? `.r[data-o="${c.line}"]:not(.add)` : `.r[data-n="${c.line}"]`
   return sec.querySelector(sel)
@@ -457,7 +469,7 @@ function spanRows(c, end) {
 function placeComment(c) {
   if (document.querySelector(`[data-cid="${CSS.escape(c.id)}"]`)) return
   const row = rowFor(c)
-  const sec = [...document.querySelectorAll('.file')].find(s => S.files[s.dataset.i].path === c.path)
+  const sec = fileSection(c.path)
   if (!sec) return
   let host = c.replyTo && document.querySelector(`[data-cid="${CSS.escape(c.replyTo)}"]`)?.closest('.thread')
   if (!host) {
@@ -613,7 +625,7 @@ $('#tab-claude').addEventListener('click', e => {
   const a = S.asks.find(x => x.id === id)
   const el = chats.get(id)
   if (el) el.scrollIntoView({ block: 'center' })
-  else if (a) { const f = [...document.querySelectorAll('.file')].find(s => S.files[s.dataset.i].path === a.path); f?.classList.remove('folded'); f?.scrollIntoView() }
+  else if (a) { const f = fileSection(a.path); f?.classList.remove('folded'); f?.scrollIntoView() }
 })
 
 // ---- streaming markdown + inline chat ------------------------------------------
@@ -784,7 +796,7 @@ async function peekLoc(el, before = 4, after = 4, toggle = true) {
 
 // Scrolls to a line of the diff (marking the symbol there); false if that line is not rendered
 function goTo(p, l, c0, c1, from) {
-  const sec = [...document.querySelectorAll('.file')].find(s => S.files[s.dataset.i].path === p)
+  const sec = fileSection(p)
   const target = sec?.querySelector(`.r[data-n="${l}"]`)
   if (!target) return false
   hidePop()
@@ -938,7 +950,7 @@ async function showPop(w, x, y, force = false, quiet = false) {
   if (data) return paint(data)
 
   if (!(await lspReady(w, seq, x, y))) return
-  const q = k => rapi(`lsp?kind=${k}&path=${encodeURIComponent(w.path)}&line=${w.line}&col=${w.a + 1}`)
+  const q = k => lsp(k, w)
   const refsP = q('references').catch(err => ({ status: 'error', message: err.message }))
   const declP = q('declaration').catch(() => null)   // not every server has it; the popover just omits the section
   let hover, def
@@ -968,7 +980,7 @@ const hoverCache = new Map()
 const escRe = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 function textUsages(w) {
-  const sec = [...document.querySelectorAll('.file')].find(f => S.files[f.dataset.i].path === w.path)
+  const sec = fileSection(w.path)
   if (!sec) return []
   const re = new RegExp(`(?<![\\w$])${escRe(w.word)}(?![\\w$])`, 'g')
   const locs = []
@@ -996,7 +1008,7 @@ async function hoverAt(row, x, y) {
   let locs = hoverCache.get(key)
   if (!locs) {
     if (lspOk && !noLsp.has(ext)) {
-      const r = await rapi(`lsp?kind=highlight&path=${encodeURIComponent(w.path)}&line=${w.line}&col=${w.a + 1}`).catch(() => null)
+      const r = await lsp('highlight', w).catch(() => null)
       if (seq !== hoverSeq) return
       if (r?.status === 'unsupported') noLsp.add(ext)
       if (r?.status === 'ok' && r.locations?.length) { locs = r.locations; hoverCache.set(key, locs) }

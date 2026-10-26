@@ -378,7 +378,7 @@ export class LspManager {
         const rel = relative(this.root, abs)
         const inside = !!rel && !isAbsolute(rel) && rel.split(sep)[0] !== '..'
         const path = inside ? rel : abs
-        const origin = !inside ? 'external' : rel.split(sep).some((s) => VENDORED.has(s)) ? 'dependency' : 'project'
+        const origin: LspLocation['origin'] = !inside ? 'external' : rel.split(sep).some((s) => VENDORED.has(s)) ? 'dependency' : 'project'
         const line = i.range.start.line + 1
         return {
           path,
