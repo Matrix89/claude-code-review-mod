@@ -75,3 +75,13 @@ export interface LspResult {
   hoverFormat?: 'markdown' | 'plaintext' // how `hover` is to be rendered
   locations?: LspLocation[]
 }
+
+export interface GraphDef { name: string; kind: string; line: number }
+export interface GraphNode {
+  path: string; lang: string; lines: number
+  defs: GraphDef[] // top-level items, for the node's detail
+  changed: boolean; additions: number; deletions: number
+  external: number // imports that leave the repo (crates, npm packages, system headers)
+}
+export interface GraphEdge { from: string; to: string; names: string[]; line: number; kind: 'use' | 'mod' | 'import' | 'include' }
+export interface GraphData { nodes: GraphNode[]; edges: GraphEdge[]; stats: { files: number; ms: number; capped: boolean } }

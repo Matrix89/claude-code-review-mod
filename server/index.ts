@@ -6,8 +6,9 @@ import { mkdirSync } from 'node:fs'
 import { parseDiff, highlightLines, escapeHtml } from './diff'
 import * as gh from './gh'
 import { LspManager } from './lsp'
+import { buildGraph } from './graph'
 import { generateManifest } from 'material-icon-theme'
-import type { DiffFile, PrMeta, ReviewComment, LspKind } from './types'
+import type { DiffFile, PrMeta, ReviewComment, LspKind, GraphData } from './types'
 
 const WEB = join(import.meta.dir, '..', 'web')
 const CACHE = join(homedir(), '.cache', 'pr-review')
@@ -30,6 +31,7 @@ interface Review {
   meta?: PrMeta; worktree?: string; localRepo?: string; viewer?: string; viewed: Set<string>
   files: DiffFile[]; comments: ReviewComment[]; asks: Ask[]
   lsp?: LspManager
+  graph?: Promise<GraphData> // built on first request: parses the whole worktree
   sourceOk: Set<string> // absolute paths a language server pointed at (outside the worktree): the only ones /source may read
   hl: Map<string, Promise<string[]>>
   subs: Set<(ev: string, data: unknown) => void>
@@ -256,6 +258,10 @@ async function api(req: Request, url: URL): Promise<Response> {
     if (!lines) return json({ error: 'path not allowed' }, 403)
     const from = Math.max(1, +q.get('from')!), to = Math.min(lines.length, +q.get('to')!)
     return json({ lines: lines.slice(from - 1, to).map((html, i) => ({ n: from + i, html })) })
+  }
+  if (verb === 'graph') {
+    r.graph ??= buildGraph(r.worktree!, new Map(r.files.map(f => [f.path, f]))).catch(e => { r.graph = undefined; throw e })
+    return json(await r.graph)
   }
   if (verb === 'lsp-status') return json(r.lsp?.status() ?? [])
   if (verb === 'lsp') {

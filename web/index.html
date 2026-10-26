@@ -10,6 +10,7 @@
 <div id="boot"><div><div class="spin"></div><div id="bootmsg">Starting…</div></div></div>
 <div id="app" hidden>
   <nav id="tree">
+    <button id="graphbtn" title="Dependency graph (g)">⬡ Dependency graph</button>
     <input id="filter" placeholder="Filter files…" autocomplete="off">
     <div id="progress"></div>
     <div id="lspstat" hidden></div>
@@ -36,9 +37,28 @@
     </section>
   </aside>
 </div>
+<div id="graph" hidden>
+  <div id="gbar">
+    <b>Dependency graph</b>
+    <select id="gscope" title="Which files to draw">
+      <option value="0">Changed files only</option>
+      <option value="1" selected>Changed + direct neighbours</option>
+      <option value="2">Changed + 2 hops</option>
+      <option value="all">Whole repository</option>
+    </select>
+    <input id="gsearch" placeholder="Find a file…" autocomplete="off">
+    <button id="gfit">Fit</button>
+    <span id="gstat" class="dim"></span>
+    <span class="dim gkeys">drag to pan · scroll to zoom · Esc to close</span>
+  </div>
+  <svg id="gsvg"></svg>
+  <div id="glegend"></div>
+  <div id="gdetail" hidden></div>
+</div>
 <div id="toast" hidden></div>
 <script src="/vendor/marked.js"></script>
 <script src="/vendor/highlight.js"></script>
 <script src="/app.js"></script>
+<script src="/graph.js"></script>
 </body>
 </html>

@@ -110,6 +110,7 @@ function init() {
   renderDiff()
   initNotes()
   initPanel()
+  initGraph()
   try { jumps = JSON.parse(localStorage.getItem('jumps:' + key) || '[]').slice(0, MAX_JUMPS) } catch {}
   renderPending()
   renderAsks()

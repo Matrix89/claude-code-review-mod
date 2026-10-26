@@ -193,3 +193,38 @@ body.dragging { cursor: ns-resize; user-select: none; }
 #pop .sec { position: sticky; top: var(--phh, 30px); z-index: 2; display: flex; align-items: center; gap: 6px; padding: 6px 0 3px; margin: 0 0 2px;
   background: var(--bg); border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; }
 #pop .sec svg { width: 14px; height: 14px; flex: none; color: var(--accent); }
+
+/* ---- dependency graph overlay ---- */
+#graphbtn { width: 100%; margin-bottom: 6px; text-align: left; }
+#graphbtn.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--panel)); }
+#graph { position: fixed; top: 0; left: 0; bottom: 0; right: 380px; z-index: 15; background: var(--bg); display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+#gbar { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+#gbar select { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+#gsearch { width: 160px; padding: 2px 8px; }
+#gstat { font-size: 12px; }
+.gkeys { margin-left: auto; font-size: 12px; }
+#gsvg { flex: 1; width: 100%; min-height: 0; cursor: grab; touch-action: none; user-select: none; }
+#gsvg:active { cursor: grabbing; }
+.gedge { stroke: var(--dim); stroke-opacity: 0.45; stroke-width: 1.2; fill: none; }
+.gedge.mod { stroke-dasharray: 3 3; }
+.gnode { cursor: pointer; }
+.gnode circle { stroke: var(--bg); stroke-width: 1.5; }
+.gnode.changed circle { stroke: var(--accent); stroke-width: 3; }
+.gnode text { font: 10px var(--mono); fill: var(--dim); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; pointer-events: none; }
+.gnode.changed text, .gnode.sel text { fill: var(--fg); font-weight: 600; }
+.gnode.sel circle { stroke: var(--warn); stroke-width: 4; }
+#gsvg.focus .gnode:not(.near), #gsvg.focus .gedge:not(.near) { opacity: 0.12; }
+#gsvg.focus .gedge.near { stroke: var(--accent); stroke-opacity: 0.95; stroke-width: 1.8; }
+#gsvg.searching .gnode:not(.hit) { opacity: 0.2; }
+#gsvg.searching .gnode.hit text { fill: var(--fg); font-weight: 700; }
+#glegend { position: absolute; left: 12px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: 55%; font-size: 11px; color: var(--dim); pointer-events: none; }
+#glegend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+#gdetail { position: absolute; right: 12px; top: 56px; bottom: 12px; width: 330px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+#gdetail .gh { display: flex; justify-content: space-between; gap: 8px; word-break: break-all; font-family: var(--mono); }
+#gdetail .gx { border: 0; background: none; font-size: 16px; padding: 0 4px; }
+#gdetail details { margin-top: 8px; }
+#gdetail summary { cursor: pointer; font-weight: 600; }
+#gdetail .gl { display: block; padding: 1px 0 1px 8px; font-family: var(--mono); cursor: pointer; word-break: break-all; }
+#gdetail .gl:hover { text-decoration: underline; }
+#gdetail .gd { padding-left: 8px; font-family: var(--mono); }
+#gdetail .gopen { margin-top: 8px; }
