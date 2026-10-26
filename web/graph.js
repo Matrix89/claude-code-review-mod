@@ -168,7 +168,41 @@ function step() {
     n.vx *= 0.82; n.vy *= 0.82
     n.x += n.vx; n.y += n.vy
   }
+  separate()
   g.alpha = Math.max(0.02, g.alpha * 0.985)
+}
+
+// Each hull's padded bounding box (the label strip is on top)
+function boxRects() {
+  for (const b of g.boxes) {
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9
+    for (const n of b.nodes) { x0 = Math.min(x0, n.x - n.r); x1 = Math.max(x1, n.x + n.r); y0 = Math.min(y0, n.y - n.r); y1 = Math.max(y1, n.y + n.r + 12) }
+    const pad = 20 + 16 * b.height
+    b.x0 = x0 - pad; b.x1 = x1 + pad; b.y0 = y0 - pad - 14; b.y1 = y1 + pad
+  }
+}
+
+// Hulls that are not nested must not overlap, and a file must not sit inside a hull it is not part of
+function separate() {
+  boxRects()
+  const bs = g.boxes
+  const move = (nodes, dx, dy) => { for (const n of nodes) if (!n.fixed) { n.x += dx; n.y += dy } }
+  for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
+    const a = bs[i], b = bs[j]
+    if (a.dir.startsWith(b.dir + '/') || b.dir.startsWith(a.dir + '/')) continue
+    const ox = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0), oy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0)
+    if (ox <= 0 || oy <= 0) continue
+    const gap = 6
+    if (ox < oy) { const d = ((ox + gap) / 2) * (a.x0 + a.x1 < b.x0 + b.x1 ? -1 : 1) * 0.6; move(a.nodes, d, 0); move(b.nodes, -d, 0) }
+    else { const d = ((oy + gap) / 2) * (a.y0 + a.y1 < b.y0 + b.y1 ? -1 : 1) * 0.6; move(a.nodes, 0, d); move(b.nodes, 0, -d) }
+  }
+  for (const b of bs) for (const n of g.nodes) {
+    if (n.boxes.includes(b) || n.x + n.r < b.x0 || n.x - n.r > b.x1 || n.y + n.r < b.y0 || n.y - n.r > b.y1) continue
+    // push the stranger out through the nearest side
+    const l = n.x - b.x0, rr = b.x1 - n.x, t = n.y - b.y0, bt = b.y1 - n.y, m = Math.min(l, rr, t, bt)
+    if (n.fixed) continue
+    if (m === l) n.x = b.x0 - n.r - 4; else if (m === rr) n.x = b.x1 + n.r + 4; else if (m === t) n.y = b.y0 - n.r - 4; else n.y = b.y1 + n.r + 4
+  }
 }
 
 function place() {
@@ -177,13 +211,11 @@ function place() {
     e.el.setAttribute('x1', e.a.x + (dx / d) * e.a.r); e.el.setAttribute('y1', e.a.y + (dy / d) * e.a.r)
     e.el.setAttribute('x2', e.b.x - (dx / d) * (e.b.r + 2)); e.el.setAttribute('y2', e.b.y - (dy / d) * (e.b.r + 2))
   }
+  boxRects()
   for (const b of g.boxes) {
-    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9
-    for (const n of b.nodes) { x0 = Math.min(x0, n.x - n.r); x1 = Math.max(x1, n.x + n.r); y0 = Math.min(y0, n.y - n.r); y1 = Math.max(y1, n.y + n.r + 12) }
-    const pad = 20 + 16 * b.height
-    b.rect.setAttribute('x', x0 - pad); b.rect.setAttribute('y', y0 - pad - 14)
-    b.rect.setAttribute('width', x1 - x0 + 2 * pad); b.rect.setAttribute('height', y1 - y0 + 2 * pad + 14)
-    b.label.setAttribute('x', x0 - pad + 8); b.label.setAttribute('y', y0 - pad + 3)
+    b.rect.setAttribute('x', b.x0); b.rect.setAttribute('y', b.y0)
+    b.rect.setAttribute('width', b.x1 - b.x0); b.rect.setAttribute('height', b.y1 - b.y0)
+    b.label.setAttribute('x', b.x0 + 8); b.label.setAttribute('y', b.y0 + 17)
   }
   for (const n of g.nodes) n.el.setAttribute('transform', `translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})`)
 }
